@@ -11,7 +11,7 @@ import SwiftUI
 struct bluetooth_pocApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView(state: ContentState())
+            PeripheralListView(state: .init())
         }
     }
 }
