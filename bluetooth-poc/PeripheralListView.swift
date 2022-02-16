@@ -14,9 +14,9 @@ struct PeripheralListView: View {
     var body: some View {
         Group {
             if (state.isBluetoothEnabled) {
-                List(state.discoveredPeripherals.sorted(by: { $0.key.uuidString > $1.key.uuidString }), id: \.key) { peripheral in
-                    Button(peripheral.value.name ?? "?") {
-                        state.connect(peripheral.value)
+                List(state.discoveredPeripherals.sorted(by: { $0.identifier.uuidString > $1.identifier.uuidString }), id: \.identifier) { peripheral in
+                    Button(peripheral.name ?? "unknown") {
+                        state.connect(peripheral)
                     }
                 }
                 Button("Tap to \(state.isScanning ? "stop" : "start") scanning") {
@@ -31,20 +31,6 @@ struct PeripheralListView: View {
                 Text("State: \(state.centralManagerState.rawValue)")
             }
         }
-        .sheet(item: $state.connectedPeripheral, onDismiss: nil) { peripheral in
-            if (state.isServicesDiscovered) {
-                let descriptorValues = peripheral.services?.flatMap { service in
-                    service.characteristics?.flatMap { characteristic in
-                        characteristic.descriptors?.map { descriptor in
-                            descriptor.value as? String ?? "Not a description"
-                        }
-                    }
-                } ?? []
-//                ForEach(descriptorValues, id: \.self) { value in
-//                    Text("hoge")
-//                }
-            }
-        }
     }
 }
 
@@ -55,18 +41,17 @@ struct ContentView_Previews: PreviewProvider {
 }
 
 final class PeripheralListViewState: NSObject, ObservableObject {
-    @Published var centralManagerState = CBManagerState.unknown {
+    @Published private(set) var centralManagerState = CBManagerState.unknown {
         didSet {
             isBluetoothEnabled = centralManagerState == .poweredOn
         }
     }
-    @Published var isBluetoothEnabled = false
-    @Published var discoveredPeripherals = [UUID:CBPeripheral]()
-    @Published var isScanning = false
-    @Published var connectedPeripheral = CBPeripheral?.none
-    @Published var isServicesDiscovered = false
+    @Published private(set) var isBluetoothEnabled = false
+    @Published private(set) var isScanning = false
+    @Published private(set) var discoveredPeripherals = Set<CBPeripheral>()
 
     private let centralManager: CBCentralManager
+    private var connectedPeripheral = CBPeripheral?.none
 
     override init() {
         centralManager = CBCentralManager()
@@ -87,6 +72,10 @@ final class PeripheralListViewState: NSObject, ObservableObject {
     }
 
     func connect(_ peripheral: CBPeripheral) {
+        if let connected = connectedPeripheral {
+            centralManager.cancelPeripheralConnection(connected)
+        }
+
         centralManager.connect(peripheral, options: nil)
     }
 }
@@ -97,23 +86,31 @@ extension PeripheralListViewState: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
-        discoveredPeripherals[peripheral.identifier] = peripheral
+        discoveredPeripherals.insert(peripheral)
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         connectedPeripheral = peripheral
         peripheral.delegate = self
+        peripheral.discoverServices([.init(string: "180A")])
     }
 }
 
 extension PeripheralListViewState: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
-        peripheral.services?.forEach { peripheral.discoverCharacteristics(nil, for: $0) }
+        peripheral.services?.forEach { peripheral.discoverCharacteristics([.init(string: "2A24")], for: $0) }
     }
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
-//        servi
+        guard let characteristic = service.characteristics?.first(where: { $0.uuid.uuidString == "2A24" }),
+              characteristic.properties.contains(.read) else { return }
+
+        peripheral.readValue(for: characteristic)
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
+        guard let data = characteristic.value else { return }
+
+        print(String(decoding: data, as: UTF8.self))
     }
 }
-
-extension CBPeripheral: Identifiable {}

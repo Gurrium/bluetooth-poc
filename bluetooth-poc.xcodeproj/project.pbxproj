@@ -11,7 +11,6 @@
 		E379386127BA804E0004A909 /* PeripheralListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E379386027BA804E0004A909 /* PeripheralListView.swift */; };
 		E379386327BA80500004A909 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E379386227BA80500004A909 /* Assets.xcassets */; };
 		E379386627BA80500004A909 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E379386527BA80500004A909 /* Preview Assets.xcassets */; };
-		E3794FE327BBE1E10004A909 /* PeripheralDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3794FE227BBE1E10004A909 /* PeripheralDetailView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -20,7 +19,6 @@
 		E379386027BA804E0004A909 /* PeripheralListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeripheralListView.swift; sourceTree = "<group>"; };
 		E379386227BA80500004A909 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		E379386527BA80500004A909 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		E3794FE227BBE1E10004A909 /* PeripheralDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeripheralDetailView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -55,7 +53,6 @@
 			children = (
 				E379385E27BA804E0004A909 /* bluetooth_pocApp.swift */,
 				E379386027BA804E0004A909 /* PeripheralListView.swift */,
-				E3794FE227BBE1E10004A909 /* PeripheralDetailView.swift */,
 				E379386227BA80500004A909 /* Assets.xcassets */,
 				E379386427BA80500004A909 /* Preview Content */,
 			);
@@ -141,7 +138,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				E379386127BA804E0004A909 /* PeripheralListView.swift in Sources */,
-				E3794FE327BBE1E10004A909 /* PeripheralDetailView.swift in Sources */,
 				E379385F27BA804E0004A909 /* bluetooth_pocApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
