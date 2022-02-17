@@ -14,9 +14,32 @@ struct PeripheralListView: View {
     var body: some View {
         Group {
             if (state.isBluetoothEnabled) {
-                List(state.discoveredPeripherals.sorted(by: { $0.identifier.uuidString > $1.identifier.uuidString }), id: \.identifier) { peripheral in
-                    Button(peripheral.name ?? "unknown") {
+                let peripherals: [CBPeripheral] = state.discoveredPeripherals.sorted(by: { $0.identifier.uuidString > $1.identifier.uuidString })
+                List(peripherals, id: \.identifier) { peripheral in
+                    Button(peripheral.name ?? "unnamed") {
                         state.connect(peripheral)
+                    }
+
+                    if let services = peripheral.services {
+                        ForEach(services, id: \.uuid) { service in
+                            Button(service.uuid.description) {
+                                state.discoverCharacteristics(for: service, of: peripheral)
+                            }
+
+                            if let characteristics = service.characteristics {
+                                ForEach(characteristics, id: \.uuid) { characteristic in
+                                    Button(characteristic.uuid.description) {
+                                        state.readValue(for: characteristic, of: peripheral)
+                                    }
+
+                                    if let data = characteristic.value {
+                                        Text(String(decoding: data, as: UTF8.self))
+                                    } else {
+                                        Text("no data")
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 Button("Tap to \(state.isScanning ? "stop" : "start") scanning") {
@@ -65,7 +88,7 @@ final class PeripheralListViewState: NSObject, ObservableObject {
         if (isScanning) {
             centralManager.stopScan()
         } else {
-        centralManager.scanForPeripherals(withServices: nil, options: nil)
+            centralManager.scanForPeripherals(withServices: nil, options: nil)
         }
 
         isScanning = !isScanning
@@ -77,6 +100,18 @@ final class PeripheralListViewState: NSObject, ObservableObject {
         }
 
         centralManager.connect(peripheral, options: nil)
+    }
+
+    func discoverServices(for peripheral: CBPeripheral) {
+        peripheral.discoverServices(nil)
+    }
+
+    func discoverCharacteristics(for service: CBService, of peripheral: CBPeripheral) {
+        peripheral.discoverCharacteristics(nil, for: service)
+    }
+
+    func readValue(for characteristic: CBCharacteristic, of peripheral: CBPeripheral) {
+        peripheral.readValue(for: characteristic)
     }
 }
 
@@ -92,25 +127,20 @@ extension PeripheralListViewState: CBCentralManagerDelegate {
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         connectedPeripheral = peripheral
         peripheral.delegate = self
-        peripheral.discoverServices([.init(string: "180A")])
+        peripheral.discoverServices(nil)
     }
 }
 
 extension PeripheralListViewState: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
-        peripheral.services?.forEach { peripheral.discoverCharacteristics([.init(string: "2A24")], for: $0) }
+        objectWillChange.send()
     }
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
-        guard let characteristic = service.characteristics?.first(where: { $0.uuid.uuidString == "2A24" }),
-              characteristic.properties.contains(.read) else { return }
-
-        peripheral.readValue(for: characteristic)
+        objectWillChange.send()
     }
 
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
-        guard let data = characteristic.value else { return }
-
-        print(String(decoding: data, as: UTF8.self))
+        objectWillChange.send()
     }
 }
