@@ -14,31 +14,47 @@ struct PeripheralListView: View {
     var body: some View {
         Group {
             if (state.isBluetoothEnabled) {
-                let peripherals: [CBPeripheral] = state.discoveredPeripherals.sorted(by: { $0.identifier.uuidString > $1.identifier.uuidString })
-                List(peripherals, id: \.identifier) { peripheral in
-                    Button(peripheral.name ?? "unnamed") {
-                        state.connect(peripheral)
-                    }
+                let peripherals = state.discoveredPeripherals.sorted(by: { $0.identifier.uuidString > $1.identifier.uuidString })
+                let items: [Item] = peripherals.map { peripheral in
+                        .init(
+                            id: peripheral.identifier,
+                            description: peripheral.name ?? "no name",
+                            content: peripheral,
+                            subItems: peripheral.services?.map { service in
+                                    .init(
+                                        id: UUID(uuidString: service.uuid.uuidString) ?? .init(),
+                                        description: service.uuid.description,
+                                        content: service,
+                                        subItems: service.characteristics?.map { characteristic in
+                                            let valueString: String
+                                            if let data = characteristic.value {
+                                                valueString = String(decoding: data, as: UTF8.self)
+                                            } else {
+                                                valueString = "no data"
+                                            }
 
-                    if let services = peripheral.services {
-                        ForEach(services, id: \.uuid) { service in
-                            Button(service.uuid.description) {
-                                state.discoverCharacteristics(for: service, of: peripheral)
+                                            return .init(
+                                                id: UUID(uuidString: characteristic.uuid.uuidString) ?? .init(),
+                                                description: "\(characteristic.uuid.description): \(valueString)",
+                                                content: characteristic,
+                                                subItems: nil
+                                            )
+                                        }
+                                    )
                             }
-
-                            if let characteristics = service.characteristics {
-                                ForEach(characteristics, id: \.uuid) { characteristic in
-                                    Button(characteristic.uuid.description) {
-                                        state.readValue(for: characteristic, of: peripheral)
-                                    }
-
-                                    if let data = characteristic.value {
-                                        Text(String(decoding: data, as: UTF8.self))
-                                    } else {
-                                        Text("no data")
-                                    }
-                                }
-                            }
+                        )
+                }
+                List(items, children: \.subItems) { item in
+                    Button("\(item.description)") {
+                        switch item.content {
+                        case let peripheral as CBPeripheral:
+                            state.connect(peripheral)
+                        case let service as CBService:
+                            state.discoverCharacteristics(for: service)
+                        case let characteristic as CBCharacteristic:
+                            state.readValue(for: characteristic)
+                        default:
+                            break
                         }
                     }
                 }
@@ -106,12 +122,12 @@ final class PeripheralListViewState: NSObject, ObservableObject {
         peripheral.discoverServices(nil)
     }
 
-    func discoverCharacteristics(for service: CBService, of peripheral: CBPeripheral) {
-        peripheral.discoverCharacteristics(nil, for: service)
+    func discoverCharacteristics(for service: CBService) {
+        service.peripheral?.discoverCharacteristics(nil, for: service)
     }
 
-    func readValue(for characteristic: CBCharacteristic, of peripheral: CBPeripheral) {
-        peripheral.readValue(for: characteristic)
+    func readValue(for characteristic: CBCharacteristic) {
+        characteristic.service?.peripheral?.readValue(for: characteristic)
     }
 }
 
@@ -143,4 +159,11 @@ extension PeripheralListViewState: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         objectWillChange.send()
     }
+}
+
+struct Item: Identifiable {
+    var id: UUID
+    var description: String
+    var content: Any? = nil
+    var subItems: [Item]?
 }
