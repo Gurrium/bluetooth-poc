@@ -22,7 +22,7 @@ struct PeripheralListView: View {
                             content: peripheral,
                             subItems: peripheral.services?.map { service in
                                     .init(
-                                        id: UUID(uuidString: service.uuid.uuidString) ?? .init(),
+                                        id: UUID(uuidString: service.uuid.description) ?? .init(),
                                         description: service.uuid.description,
                                         content: service,
                                         subItems: service.characteristics?.map { characteristic in
@@ -52,7 +52,7 @@ struct PeripheralListView: View {
                         case let service as CBService:
                             state.discoverCharacteristics(for: service)
                         case let characteristic as CBCharacteristic:
-                            state.readValue(for: characteristic)
+                            state.readOrSubscribeValue(for: characteristic)
                         default:
                             break
                         }
@@ -126,8 +126,12 @@ final class PeripheralListViewState: NSObject, ObservableObject {
         service.peripheral?.discoverCharacteristics(nil, for: service)
     }
 
-    func readValue(for characteristic: CBCharacteristic) {
-        characteristic.service?.peripheral?.readValue(for: characteristic)
+    func readOrSubscribeValue(for characteristic: CBCharacteristic) {
+        if characteristic.properties.contains(.notify) || characteristic.properties.contains(.indicate) {
+            characteristic.service?.peripheral?.setNotifyValue(true, for: characteristic)
+        } else if characteristic.properties.contains(.read) {
+            characteristic.service?.peripheral?.readValue(for: characteristic)
+        }
     }
 }
 
