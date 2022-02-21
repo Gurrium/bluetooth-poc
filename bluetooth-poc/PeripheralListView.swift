@@ -16,7 +16,11 @@ struct PeripheralListView: View {
         Group {
             if state.isBluetoothEnabled {
                 if let cscValue = state.cscValue {
-                    Text(cscValue.description)
+                    VStack(alignment: .leading) {
+                        Text("Flags: \(cscValue[0])")
+                        Text("Cumulative Crank Revolutions: \((UInt16(cscValue[2]) << 8) + UInt16(cscValue[1]))")
+                        Text("Last Crank Event Time: \((UInt16(cscValue[4]) << 8) + UInt16(cscValue[3]))")
+                    }
                 } else {
                     ProgressView()
                 }
