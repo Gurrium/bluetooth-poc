@@ -15,12 +15,8 @@ struct PeripheralListView: View {
     var body: some View {
         Group {
             if state.isBluetoothEnabled {
-                if let cscValue = state.cscValue {
-                    VStack(alignment: .leading) {
-                        Text("Flags: \(cscValue[0])")
-                        Text("Cumulative Crank Revolutions: \((UInt16(cscValue[2]) << 8) + UInt16(cscValue[1]))")
-                        Text("Last Crank Event Time: \((UInt16(cscValue[4]) << 8) + UInt16(cscValue[3]))")
-                    }
+                if let cadence = state.cadence {
+                    Text("Cadence: \(cadence)")
                 } else {
                     ProgressView()
                 }
@@ -45,7 +41,34 @@ final class PeripheralListViewState: NSObject, ObservableObject {
             }
         }
     }
-    @Published private(set) var cscValue: [UInt8]?
+    @Published private(set) var cadence: Int?
+
+    private var previousCrankEventTime: UInt16?
+    private var previousCumulativeCrankRevolutions: UInt16?
+    private var cscValue: [UInt8]? {
+        didSet {
+            guard let value = cscValue else { return }
+
+            let cumulativeCrankRevolutions = (UInt16(value[2]) << 8) + UInt16(value[1])
+            let crankEventTime = (UInt16(value[4]) << 8) + UInt16(value[3])
+
+            if let previousCumulativeCrankRevolutions = previousCumulativeCrankRevolutions,
+               let previousCrankEventTime = previousCrankEventTime {
+                let duration: UInt16
+
+                if previousCrankEventTime > crankEventTime {
+                    duration = UInt16((UInt32(crankEventTime) + UInt32(UInt16.max) + 1) - UInt32(previousCrankEventTime))
+                } else {
+                    duration = crankEventTime - previousCrankEventTime
+                }
+
+                cadence = Int(round(Double(cumulativeCrankRevolutions - previousCumulativeCrankRevolutions) / Double(duration)))
+            } else {
+                previousCrankEventTime = cumulativeCrankRevolutions
+                previousCrankEventTime = crankEventTime
+            }
+        }
+    }
 
     private let centralManager: CBCentralManager
     private var peripheral: CBPeripheral?
