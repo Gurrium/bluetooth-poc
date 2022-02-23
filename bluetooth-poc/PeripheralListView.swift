@@ -20,6 +20,10 @@ struct PeripheralListView: View {
                 } else {
                     ProgressView()
                 }
+
+                Text("cumulativeCrankRevolutions: \(state.cumulativeCrankRevolutions ?? 0)")
+                Text("crankEventTime: \(state.crankEventTime ?? 0)")
+
             } else {
                 Text("Bluetooth is not enabled.")
             }
@@ -43,6 +47,9 @@ final class PeripheralListViewState: NSObject, ObservableObject {
     }
     @Published private(set) var cadence: Int?
 
+    @Published private(set) var cumulativeCrankRevolutions: UInt16?
+    @Published private(set) var crankEventTime: UInt16?
+
     private var previousCrankEventTime: UInt16?
     private var previousCumulativeCrankRevolutions: UInt16?
     private var cscValue: [UInt8]? {
@@ -51,6 +58,9 @@ final class PeripheralListViewState: NSObject, ObservableObject {
 
             let cumulativeCrankRevolutions = (UInt16(value[2]) << 8) + UInt16(value[1])
             let crankEventTime = (UInt16(value[4]) << 8) + UInt16(value[3])
+
+            self.cumulativeCrankRevolutions = cumulativeCrankRevolutions
+            self.crankEventTime = crankEventTime
 
             if let previousCumulativeCrankRevolutions = previousCumulativeCrankRevolutions,
                let previousCrankEventTime = previousCrankEventTime {
@@ -62,9 +72,16 @@ final class PeripheralListViewState: NSObject, ObservableObject {
                     duration = crankEventTime - previousCrankEventTime
                 }
 
-                cadence = Int(round(Double(cumulativeCrankRevolutions - previousCumulativeCrankRevolutions) / Double(duration)))
+                if duration == 0 { return }
+
+                // FIXME: どこかがおかしい
+                cadence = Int(round(
+                    (Double(cumulativeCrankRevolutions - previousCumulativeCrankRevolutions) * 60)
+                    /
+                    (Double(duration) / 1024)
+                ))
             } else {
-                previousCrankEventTime = cumulativeCrankRevolutions
+                previousCumulativeCrankRevolutions = cumulativeCrankRevolutions
                 previousCrankEventTime = crankEventTime
             }
         }
