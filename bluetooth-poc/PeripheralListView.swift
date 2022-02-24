@@ -52,6 +52,13 @@ final class PeripheralListViewState: NSObject, ObservableObject {
 
     private var previousCrankEventTime: UInt16?
     private var previousCumulativeCrankRevolutions: UInt16?
+    private var isStoppedCounter = 0 {
+        didSet {
+            if isStoppedCounter > 2 {
+                cadence = 0
+            }
+        }
+    }
     private var cscValue: [UInt8]? {
         didSet {
             guard let value = cscValue else { return }
@@ -72,18 +79,20 @@ final class PeripheralListViewState: NSObject, ObservableObject {
                     duration = crankEventTime - previousCrankEventTime
                 }
 
-                if duration == 0 { return }
-
-                // FIXME: どこかがおかしい
-                cadence = Int(round(
-                    (Double(cumulativeCrankRevolutions - previousCumulativeCrankRevolutions) * 60)
-                    /
-                    (Double(duration) / 1024)
-                ))
-            } else {
-                previousCumulativeCrankRevolutions = cumulativeCrankRevolutions
-                previousCrankEventTime = crankEventTime
+                if duration > 0 {
+                    isStoppedCounter = 0
+                    cadence = Int(round(
+                        (Double(cumulativeCrankRevolutions - previousCumulativeCrankRevolutions) * 60)
+                        /
+                        (Double(duration) / 1024)
+                    ))
+                } else {
+                    isStoppedCounter += 1
+                }
             }
+
+            previousCumulativeCrankRevolutions = cumulativeCrankRevolutions
+            previousCrankEventTime = crankEventTime
         }
     }
 
