@@ -97,7 +97,7 @@ final class PeripheralListViewState: NSObject, ObservableObject {
     }
 
     private let centralManager: CBCentralManager
-    private var peripheral: CBPeripheral?
+    private var connectedPeripherals = Set<CBPeripheral>()
 
     override init() {
         centralManager = CBCentralManager()
@@ -114,7 +114,7 @@ extension PeripheralListViewState: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
-        self.peripheral = peripheral
+        connectedPeripherals.insert(peripheral)
         centralManager.connect(peripheral, options: nil)
     }
 
@@ -142,6 +142,16 @@ extension PeripheralListViewState: CBPeripheralDelegate {
         guard let value = characteristic.value else { return }
 
         cscValue = [UInt8](value)
+    }
+
+    private func parseCSCValue(_ value: [UInt8]) {
+        // ref: https://www.bluetooth.com/specifications/specs/gatt-specification-supplement-5/
+        if (value[0] & 0b0001) > 0 {
+            // wheel revolution data is present
+        }
+        if (value[0] & 0b0010) > 0 {
+            // crank revolution data is present
+        }
     }
 }
 
