@@ -21,9 +21,6 @@ struct PeripheralListView: View {
                     ProgressView()
                 }
 
-                Text("cumulativeCrankRevolutions: \(state.cumulativeCrankRevolutions ?? 0)")
-                Text("crankEventTime: \(state.crankEventTime ?? 0)")
-
             } else {
                 Text("Bluetooth is not enabled.")
             }
@@ -45,10 +42,7 @@ final class PeripheralListViewState: NSObject, ObservableObject {
             }
         }
     }
-    @Published private(set) var cadence: Int?
-
-    @Published private(set) var cumulativeCrankRevolutions: UInt16?
-    @Published private(set) var crankEventTime: UInt16?
+    @Published private(set) var cadence: Double?
 
     private var previousCrankEventTime: UInt16?
     private var previousCumulativeCrankRevolutions: UInt16?
@@ -59,15 +53,13 @@ final class PeripheralListViewState: NSObject, ObservableObject {
             }
         }
     }
+    private var cscValues = [UUID: [UInt8]]()
     private var cscValue: [UInt8]? {
         didSet {
             guard let value = cscValue else { return }
 
             let cumulativeCrankRevolutions = (UInt16(value[2]) << 8) + UInt16(value[1])
             let crankEventTime = (UInt16(value[4]) << 8) + UInt16(value[3])
-
-            self.cumulativeCrankRevolutions = cumulativeCrankRevolutions
-            self.crankEventTime = crankEventTime
 
             if let previousCumulativeCrankRevolutions = previousCumulativeCrankRevolutions,
                let previousCrankEventTime = previousCrankEventTime {
@@ -141,16 +133,57 @@ extension PeripheralListViewState: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         guard let value = characteristic.value else { return }
 
-        cscValue = [UInt8](value)
+        cscValues[peripheral.identifier] = [UInt8](value)
     }
 
     private func parseCSCValue(_ value: [UInt8]) {
+        let speed: Double?
+
         // ref: https://www.bluetooth.com/specifications/specs/gatt-specification-supplement-5/
         if (value[0] & 0b0001) > 0 {
             // wheel revolution data is present
         }
+
         if (value[0] & 0b0010) > 0 {
-            // crank revolution data is present
+            cadence = retrieveCadence(from: value)
+        }
+    }
+
+    private func retrieveCadence(from value: [UInt8]) -> Double? {
+        precondition(value[0] & 0b0010 > 0, "Crank Revolution Data Present Flag is not set")
+
+        let cumulativeCrankRevolutions = (UInt16(value[2]) << 8) + UInt16(value[1])
+        let crankEventTime = (UInt16(value[4]) << 8) + UInt16(value[3])
+
+        defer {
+            previousCumulativeCrankRevolutions = cumulativeCrankRevolutions
+            previousCrankEventTime = crankEventTime
+        }
+
+        guard let previousCumulativeCrankRevolutions = previousCumulativeCrankRevolutions,
+              let previousCrankEventTime = previousCrankEventTime else { return nil }
+
+        let duration: UInt16
+
+        if previousCrankEventTime > crankEventTime {
+            duration = UInt16((UInt32(crankEventTime) + UInt32(UInt16.max) + 1) - UInt32(previousCrankEventTime))
+        } else {
+            duration = crankEventTime - previousCrankEventTime
+        }
+
+        if duration > 0 {
+            // TODO:
+            //   ここで止まっているかどうかを判断するのは適当でない気がする。
+            //   多分retrieveCadenceというメソッド名から想定される動きを超えているから
+            isStoppedCounter = 0
+
+            return (Double(cumulativeCrankRevolutions - previousCumulativeCrankRevolutions) * 60)
+            /
+            (Double(duration) / 1024)
+        } else {
+            isStoppedCounter += 1
+
+            return nil
         }
     }
 }
