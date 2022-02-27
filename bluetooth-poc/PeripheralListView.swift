@@ -43,50 +43,25 @@ final class PeripheralListViewState: NSObject, ObservableObject {
         }
     }
     @Published private(set) var cadence: Double?
+    @Published private(set) var speed: Double?
 
     private var previousCrankEventTime: UInt16?
     private var previousCumulativeCrankRevolutions: UInt16?
-    private var isStoppedCounter = 0 {
+    private var cadenceMeasurementPauseCounter = 0 {
         didSet {
-            if isStoppedCounter > 2 {
+            if cadenceMeasurementPauseCounter > 2 {
                 cadence = 0
             }
         }
     }
-    private var cscValues = [UUID: [UInt8]]()
-    private var cscValue: [UInt8]? {
+    private var speedMeasurementPauseCounter = 0 {
         didSet {
-            guard let value = cscValue else { return }
-
-            let cumulativeCrankRevolutions = (UInt16(value[2]) << 8) + UInt16(value[1])
-            let crankEventTime = (UInt16(value[4]) << 8) + UInt16(value[3])
-
-            if let previousCumulativeCrankRevolutions = previousCumulativeCrankRevolutions,
-               let previousCrankEventTime = previousCrankEventTime {
-                let duration: UInt16
-
-                if previousCrankEventTime > crankEventTime {
-                    duration = UInt16((UInt32(crankEventTime) + UInt32(UInt16.max) + 1) - UInt32(previousCrankEventTime))
-                } else {
-                    duration = crankEventTime - previousCrankEventTime
-                }
-
-                if duration > 0 {
-                    isStoppedCounter = 0
-                    cadence = Int(round(
-                        (Double(cumulativeCrankRevolutions - previousCumulativeCrankRevolutions) * 60)
-                        /
-                        (Double(duration) / 1024)
-                    ))
-                } else {
-                    isStoppedCounter += 1
-                }
+            if speedMeasurementPauseCounter > 2 {
+                speed = 0
             }
-
-            previousCumulativeCrankRevolutions = cumulativeCrankRevolutions
-            previousCrankEventTime = crankEventTime
         }
     }
+    private var cscValues = [UUID: [UInt8]]()
 
     private let centralManager: CBCentralManager
     private var connectedPeripherals = Set<CBPeripheral>()
@@ -137,16 +112,30 @@ extension PeripheralListViewState: CBPeripheralDelegate {
     }
 
     private func parseCSCValue(_ value: [UInt8]) {
-        let speed: Double?
-
         // ref: https://www.bluetooth.com/specifications/specs/gatt-specification-supplement-5/
         if (value[0] & 0b0001) > 0 {
-            // wheel revolution data is present
+            if let retrieved = retrieveSpeed(from: value) {
+                speedMeasurementPauseCounter = 0
+
+                speed = retrieved
+            } else {
+                speedMeasurementPauseCounter += 1
+            }
         }
 
         if (value[0] & 0b0010) > 0 {
-            cadence = retrieveCadence(from: value)
+            if let retrieved = retrieveCadence(from: value) {
+                cadenceMeasurementPauseCounter = 0
+
+                cadence = retrieved
+            } else {
+                cadenceMeasurementPauseCounter += 1
+            }
         }
+    }
+
+    private func retrieveSpeed(from value: [UInt8]) -> Double? {
+        return nil
     }
 
     private func retrieveCadence(from value: [UInt8]) -> Double? {
@@ -171,20 +160,11 @@ extension PeripheralListViewState: CBPeripheralDelegate {
             duration = crankEventTime - previousCrankEventTime
         }
 
-        if duration > 0 {
-            // TODO:
-            //   ここで止まっているかどうかを判断するのは適当でない気がする。
-            //   多分retrieveCadenceというメソッド名から想定される動きを超えているから
-            isStoppedCounter = 0
+        guard duration > 0 else { return nil }
 
-            return (Double(cumulativeCrankRevolutions - previousCumulativeCrankRevolutions) * 60)
-            /
-            (Double(duration) / 1024)
-        } else {
-            isStoppedCounter += 1
-
-            return nil
-        }
+        return (Double(cumulativeCrankRevolutions - previousCumulativeCrankRevolutions) * 60)
+        /
+        (Double(duration) / 1024)
     }
 }
 
