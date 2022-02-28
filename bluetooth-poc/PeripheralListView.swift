@@ -54,6 +54,8 @@ final class PeripheralListViewState: NSObject, ObservableObject {
             }
         }
     }
+    private var previousWheelEventTime: UInt16?
+    private var previousCumulativeWheelRevolutions: UInt32?
     private var speedMeasurementPauseCounter = 0 {
         didSet {
             if speedMeasurementPauseCounter > 2 {
@@ -135,7 +137,35 @@ extension PeripheralListViewState: CBPeripheralDelegate {
     }
 
     private func retrieveSpeed(from value: [UInt8]) -> Double? {
-        return nil
+        precondition(value[0] & 0b0001 > 0, "Wheel Revolution Data Present Flag is not set")
+
+        let cumulativeWheelRevolutions = UInt32(value[4] << 24) + UInt32(value[3] << 16) + UInt32(value[2] << 8) + UInt32(value[1])
+        let wheelEventTime = UInt16(value[5] << 8) + UInt16(value[6])
+
+        defer {
+            previousCumulativeWheelRevolutions = cumulativeWheelRevolutions
+            previousWheelEventTime = wheelEventTime
+        }
+
+        guard let previousCumulativeWheelRevolutions = previousCumulativeWheelRevolutions,
+              let previousWheelEventTime = previousWheelEventTime else { return nil }
+
+        let duration: UInt16
+
+        if previousWheelEventTime > wheelEventTime {
+            duration = UInt16((UInt32(wheelEventTime) + UInt32(UInt16.max) + 1) - UInt32(previousWheelEventTime))
+        } else {
+            duration = wheelEventTime - previousWheelEventTime
+        }
+
+        guard duration > 0 else { return nil }
+
+        let revolutionsPerSec = Double(cumulativeWheelRevolutions - previousCumulativeWheelRevolutions) / (Double(duration) / 1024)
+
+        // TODO: 可変にする?なくてもいいかも
+        let wheelCircumference = 2105.0 // [mm]
+
+        return revolutionsPerSec * wheelCircumference * 3600 / 1_000_000
     }
 
     private func retrieveCadence(from value: [UInt8]) -> Double? {
