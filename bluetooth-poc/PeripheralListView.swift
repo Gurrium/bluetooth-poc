@@ -15,12 +15,8 @@ struct PeripheralListView: View {
     var body: some View {
         Group {
             if state.isBluetoothEnabled {
-                if let cadence = state.cadence {
-                    Text("Cadence: \(cadence)")
-                } else {
-                    ProgressView()
-                }
-
+                Text("Cadence: \(state.cadence ?? -1)")
+                Text("Speed: \(state.speed ?? -1)")
             } else {
                 Text("Bluetooth is not enabled.")
             }
@@ -165,7 +161,7 @@ extension PeripheralListViewState: CBPeripheralDelegate {
         // TODO: 可変にする?なくてもいいかも
         let wheelCircumference = 2105.0 // [mm]
 
-        return revolutionsPerSec * wheelCircumference * 3600 / 1_000_000
+        return revolutionsPerSec * wheelCircumference * 3600 / 1_000_000 // [km/h]
     }
 
     private func retrieveCadence(from value: [UInt8]) -> Double? {
