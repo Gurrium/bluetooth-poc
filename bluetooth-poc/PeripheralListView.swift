@@ -59,7 +59,7 @@ final class PeripheralListViewState: NSObject, ObservableObject {
             }
         }
     }
-    private var cscValues = [UUID: [UInt8]]()
+//    private var cscValues = [UUID: [UInt8]]()
 
     private let centralManager: CBCentralManager
     private var connectedPeripherals = Set<CBPeripheral>()
@@ -106,7 +106,9 @@ extension PeripheralListViewState: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         guard let value = characteristic.value else { return }
 
-        cscValues[peripheral.identifier] = [UInt8](value)
+//        cscValues[peripheral.identifier] = [UInt8](value)
+        print([UInt8](value))
+        parseCSCValue([UInt8](value))
     }
 
     private func parseCSCValue(_ value: [UInt8]) {
@@ -135,8 +137,8 @@ extension PeripheralListViewState: CBPeripheralDelegate {
     private func retrieveSpeed(from value: [UInt8]) -> Double? {
         precondition(value[0] & 0b0001 > 0, "Wheel Revolution Data Present Flag is not set")
 
-        let cumulativeWheelRevolutions = UInt32(value[4] << 24) + UInt32(value[3] << 16) + UInt32(value[2] << 8) + UInt32(value[1])
-        let wheelEventTime = UInt16(value[5] << 8) + UInt16(value[6])
+        let cumulativeWheelRevolutions = (UInt32(value[4]) << 24) + (UInt32(value[3]) << 16) + (UInt32(value[2]) << 8) + UInt32(value[1])
+        let wheelEventTime = (UInt16(value[5]) << 8) + UInt16(value[6])
 
         defer {
             previousCumulativeWheelRevolutions = cumulativeWheelRevolutions
