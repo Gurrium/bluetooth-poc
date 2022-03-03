@@ -106,15 +106,13 @@ extension PeripheralListViewState: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         guard let value = characteristic.value else { return }
 
-//        cscValues[peripheral.identifier] = [UInt8](value)
-        print([UInt8](value))
         parseCSCValue([UInt8](value))
     }
 
     private func parseCSCValue(_ value: [UInt8]) {
         // ref: https://www.bluetooth.com/specifications/specs/gatt-specification-supplement-5/
         if (value[0] & 0b0001) > 0 {
-            if let retrieved = retrieveSpeed(from: value) {
+            if let retrieved = parseSpeed(from: value) {
                 speedMeasurementPauseCounter = 0
 
                 speed = retrieved
@@ -124,7 +122,7 @@ extension PeripheralListViewState: CBPeripheralDelegate {
         }
 
         if (value[0] & 0b0010) > 0 {
-            if let retrieved = retrieveCadence(from: value) {
+            if let retrieved = parseCadence(from: value) {
                 cadenceMeasurementPauseCounter = 0
 
                 cadence = retrieved
@@ -134,11 +132,11 @@ extension PeripheralListViewState: CBPeripheralDelegate {
         }
     }
 
-    private func retrieveSpeed(from value: [UInt8]) -> Double? {
+    private func parseSpeed(from value: [UInt8]) -> Double? {
         precondition(value[0] & 0b0001 > 0, "Wheel Revolution Data Present Flag is not set")
 
         let cumulativeWheelRevolutions = (UInt32(value[4]) << 24) + (UInt32(value[3]) << 16) + (UInt32(value[2]) << 8) + UInt32(value[1])
-        let wheelEventTime = (UInt16(value[5]) << 8) + UInt16(value[6])
+        let wheelEventTime = (UInt16(value[6]) << 8) + UInt16(value[5])
 
         defer {
             previousCumulativeWheelRevolutions = cumulativeWheelRevolutions
@@ -166,7 +164,7 @@ extension PeripheralListViewState: CBPeripheralDelegate {
         return revolutionsPerSec * wheelCircumference * 3600 / 1_000_000 // [km/h]
     }
 
-    private func retrieveCadence(from value: [UInt8]) -> Double? {
+    private func parseCadence(from value: [UInt8]) -> Double? {
         precondition(value[0] & 0b0010 > 0, "Crank Revolution Data Present Flag is not set")
 
         let cumulativeCrankRevolutions = (UInt16(value[2]) << 8) + UInt16(value[1])
