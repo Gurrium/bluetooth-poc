@@ -15,8 +15,10 @@ struct PeripheralListView: View {
     var body: some View {
         Group {
             if state.isBluetoothEnabled {
-                Text("Cadence: \(state.cadence ?? -1)")
-                Text("Speed: \(state.speed ?? -1)")
+                VStack(alignment: .leading) {
+                    Text("Cadence: \(state.cadence ?? -1)")
+                    Text("Speed: \(state.speed ?? -1)")
+                }
             } else {
                 Text("Bluetooth is not enabled.")
             }
@@ -59,7 +61,6 @@ final class PeripheralListViewState: NSObject, ObservableObject {
             }
         }
     }
-//    private var cscValues = [UUID: [UInt8]]()
 
     private let centralManager: CBCentralManager
     private var connectedPeripherals = Set<CBPeripheral>()
@@ -188,9 +189,7 @@ extension PeripheralListViewState: CBPeripheralDelegate {
 
         guard duration > 0 else { return nil }
 
-        return (Double(cumulativeCrankRevolutions - previousCumulativeCrankRevolutions) * 60)
-        /
-        (Double(duration) / 1024)
+        return (Double(cumulativeCrankRevolutions - previousCumulativeCrankRevolutions) * 60) / (Double(duration) / 1024)
     }
 }
 
